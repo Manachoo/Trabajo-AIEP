@@ -1,10 +1,10 @@
-# FoodDelivery (Proyecto Universitario - Arquitectura Anti-Patrón)
+# FoodDelivery Proyecto para la Universitario
 
 Este proyecto fue generado como caso de estudio de mala arquitectura de software para ser refactorizado. Incluye una **God Class** en el backend llamada `Pedido` que rompe el principio de Single Responsibility (SRP) y genera alto acoplamiento.
 
 ## Estructura
 
-- `/backend`: API construida con FastAPI y SQLite (usando conexión directa para fines educativos del problema de acoplamiento).
+- `/backend`: API construida con FastAPI y SQLite.
 - `/frontend`: Interfaz de usuario con React, Vite y TailwindCSS.
 
 ## Requisitos
@@ -49,13 +49,10 @@ npm run dev
 El frontend estará disponible en el puerto por defecto de Vite (usualmente `http://localhost:5173`).
 
 
-## Explicación del Anti-Patrón (God Class)
-El endpoint `/pedido` inicializa la clase `Pedido` y llama al flujo `crear_pedido(usuario_id, productos_ids)`. 
-Esta clase es **intencionalmente deficiente** y está altamente acoplada:
+## Explicación de la clase pedido
 1. Recibe la petición.
 2. Calcula los precios interactuando directamente con la base de datos `sqlite3`.
 3. Valida y deduce el stock de forma destructiva (sin manejo de transacciones).
 4. Verifica saldo del usuario y simula el pago en su propio flujo.
 5. Registra el pedido final.
 
-La UI de React permite agregar productos al carrito y ejecutar este super-método pinchando en *Pagar*. ¡Buena suerte refactorizando!
