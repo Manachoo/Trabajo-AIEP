@@ -25,7 +25,7 @@
     "total": "Total",
     "processing": "Processing payment...",
     "checkout": "Pay and Checkout",
-    "footerNote": "Checkout triggers the backend God Class that handles stock and payment in a single flawed transaction."
+    "footerNote": "Checkout uses a modular backend flow with facade, command, and repository components."
   },
   "errors": {
     "fetchProducts": "Failed to load products.",

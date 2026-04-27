@@ -1,65 +1,75 @@
-# FoodDelivery Study Project
+# FoodDelivery Component Architecture
 
-This project is intentionally designed as a software architecture refactoring case study. It includes a backend **God Class** (`OrderProcessor`) that violates the Single Responsibility Principle (SRP) and demonstrates high coupling.
+This project implements a food ordering flow using a modular backend with **Facade**, **Command**, **Abstract Factory**, and **Repository** patterns. The backend uses **FastAPI + PostgreSQL** and the frontend uses **React + Vite**.
 
-## Structure
+## Architecture Overview
 
-- `/backend`: FastAPI API with SQLite.
-- `/frontend`: React user interface with Vite and TailwindCSS.
+- `OrderFacade` orchestrates order processing from the API layer.
+- `ProcessOrderCommand` encapsulates the transaction flow and exposes `execute`/`undo`.
+- `PaymentFactory` creates the correct payment processor by method.
+- Repositories isolate data access (`UserRepository`, `ProductRepository`, `OrderRepository`).
+- FastAPI routes interact with application services, not with raw SQL.
 
-## Requirements
+## Project Structure
 
-- Python 3.9+
-- Node.js 18+
+- `/backend`
+  - `main.py`: FastAPI app bootstrap and startup initialization.
+  - `app/api`: routes, request/response schemas, DI dependencies.
+  - `app/application`: facade and command use cases.
+  - `app/domain`: domain interfaces and contracts.
+  - `app/infrastructure`: database setup, ORM models, repositories, payment implementations.
+- `/frontend`: React UI.
+- `docker-compose.yml`: multi-service setup (`postgres`, `backend`, `frontend`).
+- `docs/components.puml`: UML component diagram source.
 
-## Backend Setup
-
-1. Open the backend directory:
-
-```bash
-cd backend
-```
-
-2. Install dependencies (a virtual environment is recommended):
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Start the server. The SQLite database is created automatically and seeded with initial data:
+## Run with Docker (Dev and Prod-like)
 
 ```bash
-uvicorn main:app --reload
+docker compose up --build
 ```
 
-Backend base URL: `http://127.0.0.1:8000`
+Services:
 
-## Frontend Setup
+- Frontend: `http://localhost:8081`
+- Backend: `http://localhost:8000`
+- Backend docs: `http://localhost:8000/docs`
+- PostgreSQL: `localhost:5432`
 
-1. Open a new terminal and go to the frontend directory:
+Default database settings (already wired in `docker-compose.yml`):
+
+- DB name: `food_delivery`
+- User: `food_user`
+- Password: `food_password`
+
+## API Endpoints
+
+- `GET /health`
+- `GET /products`
+- `POST /orders`
+
+Example order payload:
+
+```json
+{
+  "user_id": 1,
+  "product_ids": [1, 2],
+  "payment_method": "balance"
+}
+```
+
+`payment_method` is optional and defaults to `balance`.
+
+## Notes
+
+- Database schema and seed data are initialized automatically on backend startup.
+- The order process is transactional: stock reservation, payment, and order persistence are handled atomically.
+- `undo()` is implemented as compensating logic for external payment refunds.
+
+## Backend Tests
+
+Run backend integration tests inside Docker:
 
 ```bash
-cd frontend
+docker compose exec backend pip install -r requirements-dev.txt
+docker compose exec backend pytest -q
 ```
-
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Run the development server:
-
-```bash
-npm run dev
-```
-
-Frontend URL (default Vite port): `http://localhost:5173`
-
-## About the OrderProcessor God Class
-
-1. Receives the request.
-2. Calculates totals while querying SQLite directly.
-3. Validates and decrements stock in a destructive flow (without proper transaction boundaries).
-4. Verifies user balance and simulates payment in the same flow.
-5. Persists the final order.

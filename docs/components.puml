@@ -1,0 +1,53 @@
+@startuml
+skinparam componentStyle uml2
+
+package "Frontend" {
+  component "React UI" as ReactUI
+}
+
+package "API Layer" {
+  component "FastAPI Router" as ApiRouter
+  interface "IOrderFacade" as IOrderFacade
+}
+
+package "Application Layer" {
+  component "OrderFacade" as OrderFacade
+  component "ProcessOrderCommand" as ProcessOrderCommand
+  interface "IOrderCommand" as IOrderCommand
+}
+
+package "Domain Contracts" {
+  interface "IPaymentProcessor" as IPaymentProcessor
+}
+
+package "Infrastructure Layer" {
+  component "PaymentFactory" as PaymentFactory
+  component "BalancePaymentProcessor" as BalancePaymentProcessor
+  component "PointsPaymentProcessor" as PointsPaymentProcessor
+  component "UserRepository" as UserRepository
+  component "ProductRepository" as ProductRepository
+  component "OrderRepository" as OrderRepository
+  database "PostgreSQL" as PostgreSQL
+}
+
+ReactUI ..> ApiRouter : HTTP
+ApiRouter ..> IOrderFacade : uses
+IOrderFacade <|.. OrderFacade
+OrderFacade ..> IOrderCommand : builds/executes
+IOrderCommand <|.. ProcessOrderCommand
+
+OrderFacade ..> PaymentFactory : create processor
+PaymentFactory ..> IPaymentProcessor : returns
+IPaymentProcessor <|.. BalancePaymentProcessor
+IPaymentProcessor <|.. PointsPaymentProcessor
+
+ProcessOrderCommand ..> UserRepository
+ProcessOrderCommand ..> ProductRepository
+ProcessOrderCommand ..> OrderRepository
+ProcessOrderCommand ..> IPaymentProcessor
+
+UserRepository ..> PostgreSQL
+ProductRepository ..> PostgreSQL
+OrderRepository ..> PostgreSQL
+
+@enduml
