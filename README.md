@@ -1,58 +1,65 @@
-# FoodDelivery Proyecto para la Universitario
+# FoodDelivery Study Project
 
-Este proyecto fue generado como caso de estudio de mala arquitectura de software para ser refactorizado. Incluye una **God Class** en el backend llamada `Pedido` que rompe el principio de Single Responsibility (SRP) y genera alto acoplamiento.
+This project is intentionally designed as a software architecture refactoring case study. It includes a backend **God Class** (`OrderProcessor`) that violates the Single Responsibility Principle (SRP) and demonstrates high coupling.
 
-## Estructura
+## Structure
 
-- `/backend`: API construida con FastAPI y SQLite.
-- `/frontend`: Interfaz de usuario con React, Vite y TailwindCSS.
+- `/backend`: FastAPI API with SQLite.
+- `/frontend`: React user interface with Vite and TailwindCSS.
 
-## Requisitos
+## Requirements
 
 - Python 3.9+
 - Node.js 18+
 
-## Instrucciones para el Backend
+## Backend Setup
 
-1. Navegar a la carpeta backend:
+1. Open the backend directory:
+
 ```bash
 cd backend
 ```
 
-2. Instalar las dependencias (se recomienda usar un entorno virtual):
+2. Install dependencies (a virtual environment is recommended):
+
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Ejecutar el servidor. La base de datos SQLite se creará automáticamente y se llenará con datos iniciales:
+3. Start the server. The SQLite database is created automatically and seeded with initial data:
+
 ```bash
 uvicorn main:app --reload
 ```
-El servidor backend estará disponible en `http://127.0.0.1:8000`.
 
-## Instrucciones para el Frontend
+Backend base URL: `http://127.0.0.1:8000`
 
-1. Abrir una nueva terminal y navegar a la carpeta frontend:
+## Frontend Setup
+
+1. Open a new terminal and go to the frontend directory:
+
 ```bash
 cd frontend
 ```
 
-2. Instalar dependencias (ya deben estar instaladas si se inicializó correctamente, pero por si acaso):
+2. Install dependencies:
+
 ```bash
 npm install
 ```
 
-3. Correr el servidor de desarrollo:
+3. Run the development server:
+
 ```bash
 npm run dev
 ```
-El frontend estará disponible en el puerto por defecto de Vite (usualmente `http://localhost:5173`).
 
+Frontend URL (default Vite port): `http://localhost:5173`
 
-## Explicación de la clase pedido
-1. Recibe la petición.
-2. Calcula los precios interactuando directamente con la base de datos `sqlite3`.
-3. Valida y deduce el stock de forma destructiva (sin manejo de transacciones).
-4. Verifica saldo del usuario y simula el pago en su propio flujo.
-5. Registra el pedido final.
+## About the OrderProcessor God Class
 
+1. Receives the request.
+2. Calculates totals while querying SQLite directly.
+3. Validates and decrements stock in a destructive flow (without proper transaction boundaries).
+4. Verifies user balance and simulates payment in the same flow.
+5. Persists the final order.

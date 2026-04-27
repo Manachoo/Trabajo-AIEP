@@ -1,84 +1,134 @@
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ShoppingCart, UtensilsCrossed, AlertCircle, CheckCircle } from 'lucide-react'
+
 import { Button } from './components/ui/button'
 
-interface Producto {
+interface ApiProduct {
   id: number
-  restaurante_id: number
-  nombre: string
-  precio: number
+  restaurant_id: number
+  name: string
+  price: number
   stock: number
 }
 
-function App() {
-  const [productos, setProductos] = useState<Producto[]>([])
-  const [carrito, setCarrito] = useState<Producto[]>([])
-  const [loading, setLoading] = useState(false)
-  const [mensaje, setMensaje] = useState<{ tipo: 'error' | 'success', texto: string } | null>(null)
+interface Product {
+  id: number
+  restaurantId: number
+  name: string
+  price: number
+  stock: number
+}
 
-  const API_URL = "http://localhost:8000"
-  
-  // Usuario Dummy (simulando autenticación)
-  const usuario_id = 1
+interface OrderResponse {
+  message: string
+  order_id: number
+  total: number
+  new_user_balance: number
+}
+
+interface Notification {
+  type: 'error' | 'success'
+  text: string
+}
+
+const API_URL = 'http://localhost:8000'
+const CURRENT_USER_ID = 1
+const CURRENT_USER_NAME = 'John Perez'
+
+const mapApiProductToProduct = (product: ApiProduct): Product => ({
+  id: product.id,
+  restaurantId: product.restaurant_id,
+  name: product.name,
+  price: product.price,
+  stock: product.stock,
+})
+
+function App() {
+  const { t, i18n } = useTranslation('common')
+  const [products, setProducts] = useState<Product[]>([])
+  const [cart, setCart] = useState<Product[]>([])
+  const [loading, setLoading] = useState(false)
+  const [notification, setNotification] = useState<Notification | null>(null)
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat(i18n.resolvedLanguage ?? 'en', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(value)
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/products`)
+      if (!response.ok) {
+        throw new Error(t('errors.fetchProducts'))
+      }
+      const data: ApiProduct[] = await response.json()
+      setProducts(data.map(mapApiProductToProduct))
+    } catch (error) {
+      console.error(error)
+      setNotification({ type: 'error', text: t('errors.fetchProducts') })
+    }
+  }, [t])
 
   useEffect(() => {
-    fetchProductos()
-  }, [])
+    void fetchProducts()
+  }, [fetchProducts])
 
-  const fetchProductos = async () => {
-    try {
-      const res = await fetch(`${API_URL}/productos`)
-      const data = await res.json()
-      setProductos(data)
-    } catch (e) {
-      console.error(e)
+  const addToCart = (product: Product) => {
+    setCart([...cart, product])
+  }
+
+  const removeFromCart = (index: number) => {
+    const nextCart = [...cart]
+    nextCart.splice(index, 1)
+    setCart(nextCart)
+  }
+
+  const submitOrder = async () => {
+    if (cart.length === 0) {
+      return
     }
-  }
 
-  const agregarAlCarrito = (producto: Producto) => {
-    setCarrito([...carrito, producto])
-  }
-
-  const removerDelCarrito = (index: number) => {
-    const nuevoCarrito = [...carrito]
-    nuevoCarrito.splice(index, 1)
-    setCarrito(nuevoCarrito)
-  }
-
-  const procesarPedido = async () => {
-    if (carrito.length === 0) return
-    
     setLoading(true)
-    setMensaje(null)
+    setNotification(null)
+
     try {
-      const productoIds = carrito.map(p => p.id)
-      const res = await fetch(`${API_URL}/pedido`, {
+      const productIds = cart.map((product) => product.id)
+      const response = await fetch(`${API_URL}/orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          usuario_id,
-          productos_ids: productoIds
-        })
+          user_id: CURRENT_USER_ID,
+          product_ids: productIds,
+        }),
       })
-      
-      const data = await res.json()
-      
-      if (!res.ok) {
-        throw new Error(data.detail || "Error al procesar el pedido")
+
+      const payload = await response.json()
+
+      if (!response.ok) {
+        const detail = typeof payload?.detail === 'string' ? payload.detail : t('errors.processOrder')
+        throw new Error(detail)
       }
-      
-      setMensaje({ tipo: 'success', texto: `¡Pedido pagado! Nuevo saldo: $${data.nuevo_saldo_usuario}` })
-      setCarrito([])
-      fetchProductos() // Actualizar stock
-      
-    } catch (error: any) {
-      setMensaje({ tipo: 'error', texto: error.message })
+
+      const data = payload as OrderResponse
+      setNotification({
+        type: 'success',
+        text: t('messages.orderPaid', {
+          balance: formatCurrency(data.new_user_balance),
+        }),
+      })
+      setCart([])
+      await fetchProducts()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t('errors.processOrder')
+      setNotification({ type: 'error', text: message })
     } finally {
       setLoading(false)
     }
   }
 
-  const total = carrito.reduce((acc, obj) => acc + obj.precio, 0)
+  const total = cart.reduce((accumulator, item) => accumulator + item.price, 0)
 
   return (
     <div className="min-h-screen bg-background text-foreground p-8">
@@ -88,64 +138,82 @@ function App() {
             <div className="bg-primary p-2 rounded-lg text-primary-foreground">
               <UtensilsCrossed size={28} />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">Food Delivery</h1>
+            <h1 className="text-3xl font-bold tracking-tight">{t('app.title')}</h1>
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
-            Hola, <span className="text-foreground font-medium">Juan Perez (ID: {usuario_id})</span>
+            {t('header.greeting')},{' '}
+            <span className="text-foreground font-medium">
+              {t('header.userLabel', { name: CURRENT_USER_NAME, id: CURRENT_USER_ID })}
+            </span>
           </div>
         </header>
 
-        {mensaje && (
-          <div className={`p-4 rounded-md border flex items-center gap-3 ${
-            mensaje.tipo === 'success' 
-            ? 'bg-green-500/10 border-green-500/50 text-green-600' 
-            : 'bg-red-500/10 border-destructive/50 text-destructive'
-          }`}>
-            {mensaje.tipo === 'success' ? <CheckCircle /> : <AlertCircle />}
-            <span className="font-medium">{mensaje.texto}</span>
+        {notification && (
+          <div
+            className={`p-4 rounded-md border flex items-center gap-3 ${
+              notification.type === 'success'
+                ? 'bg-green-500/10 border-green-500/50 text-green-600'
+                : 'bg-red-500/10 border-destructive/50 text-destructive'
+            }`}
+          >
+            {notification.type === 'success' ? <CheckCircle /> : <AlertCircle />}
+            <span className="font-medium">{notification.text}</span>
           </div>
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          
           <div className="md:col-span-2 space-y-6">
-            <h2 className="text-xl font-semibold">Productos Disponibles</h2>
+            <h2 className="text-xl font-semibold">{t('products.title')}</h2>
             <div className="rounded-md border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Nombre</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Precio</th>
-                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Stock</th>
-                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Acción</th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                      {t('products.table.name')}
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                      {t('products.table.price')}
+                    </th>
+                    <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                      {t('products.table.stock')}
+                    </th>
+                    <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">
+                      {t('products.table.action')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {productos.map((producto) => (
-                    <tr key={producto.id} className="hover:bg-muted/50 transition-colors">
-                      <td className="p-4 align-middle font-medium">{producto.nombre}</td>
-                      <td className="p-4 align-middle">${producto.precio.toFixed(2)}</td>
+                  {products.map((product) => (
+                    <tr key={product.id} className="hover:bg-muted/50 transition-colors">
+                      <td className="p-4 align-middle font-medium">{product.name}</td>
+                      <td className="p-4 align-middle">{formatCurrency(product.price)}</td>
                       <td className="p-4 align-middle">
-                        <span className={`px-2 py-1 rounded-full text-xs font-semibold ${producto.stock > 5 ? 'bg-green-500/20 text-green-500' : 'bg-yellow-500/20 text-yellow-500'}`}>
-                          {producto.stock} uds
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                            product.stock > 5
+                              ? 'bg-green-500/20 text-green-500'
+                              : 'bg-yellow-500/20 text-yellow-500'
+                          }`}
+                        >
+                          {t('products.table.units', { count: product.stock })}
                         </span>
                       </td>
                       <td className="p-4 align-middle text-right">
-                        <Button 
-                          variant="secondary" 
+                        <Button
+                          variant="secondary"
                           size="sm"
-                          onClick={() => agregarAlCarrito(producto)}
-                          disabled={loading || producto.stock <= 0}
+                          onClick={() => addToCart(product)}
+                          disabled={loading || product.stock <= 0}
                         >
-                          Añadir
+                          {t('products.add')}
                         </Button>
                       </td>
                     </tr>
                   ))}
-                  {productos.length === 0 && (
+                  {products.length === 0 && (
                     <tr>
                       <td colSpan={4} className="p-4 text-center text-muted-foreground">
-                        Cargando productos o sin stock...
+                        {t('products.emptyState')}
                       </td>
                     </tr>
                   )}
@@ -158,24 +226,24 @@ function App() {
             <div className="border border-border rounded-xl p-6 bg-card flex flex-col h-full shadow-sm">
               <div className="flex items-center gap-2 mb-6">
                 <ShoppingCart className="text-primary" />
-                <h2 className="text-xl font-semibold">Tu Pedido</h2>
+                <h2 className="text-xl font-semibold">{t('cart.title')}</h2>
               </div>
-              
+
               <div className="flex-1 overflow-y-auto space-y-4 mb-6">
-                {carrito.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">El carrito está vacío.</p>
+                {cart.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">{t('cart.empty')}</p>
                 ) : (
-                  carrito.map((item, index) => (
+                  cart.map((item, index) => (
                     <div key={index} className="flex justify-between items-center text-sm">
-                      <span className="truncate pr-4">{item.nombre}</span>
+                      <span className="truncate pr-4">{item.name}</span>
                       <div className="flex items-center gap-3">
-                        <span className="font-semibold">${item.precio.toFixed(2)}</span>
-                        <button 
-                          onClick={() => removerDelCarrito(index)}
+                        <span className="font-semibold">{formatCurrency(item.price)}</span>
+                        <button
+                          onClick={() => removeFromCart(index)}
                           className="text-destructive hover:underline text-xs"
                           disabled={loading}
                         >
-                          Quitar
+                          {t('cart.remove')}
                         </button>
                       </div>
                     </div>
@@ -185,23 +253,20 @@ function App() {
 
               <div className="border-t border-border pt-4 mt-auto">
                 <div className="flex justify-between items-center mb-6">
-                  <span className="font-medium text-lg">Total</span>
-                  <span className="text-2xl font-bold tracking-tight">${total.toFixed(2)}</span>
+                  <span className="font-medium text-lg">{t('cart.total')}</span>
+                  <span className="text-2xl font-bold tracking-tight">{formatCurrency(total)}</span>
                 </div>
-                <Button 
+                <Button
                   className="w-full text-lg h-12"
-                  onClick={procesarPedido}
-                  disabled={carrito.length === 0 || loading}
+                  onClick={submitOrder}
+                  disabled={cart.length === 0 || loading}
                 >
-                  {loading ? "Procesando el pago..." : "Pagar y Finalizar"}
+                  {loading ? t('cart.processing') : t('cart.checkout')}
                 </Button>
-                <p className="text-xs text-muted-foreground mt-4 text-center">
-                  Al pagar se invocará la God Class del backend que procesa stock y pago en una sola transacción defectuosa.
-                </p>
+                <p className="text-xs text-muted-foreground mt-4 text-center">{t('cart.footerNote')}</p>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>

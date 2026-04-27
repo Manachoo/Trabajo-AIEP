@@ -1,30 +1,30 @@
-# Etapa 1: Construcción de la aplicación
+# Stage 1: Build the application
 FROM node:20-alpine AS build
 
-# Establece el directorio de trabajo
+# Set working directory
 WORKDIR /app
 
-# Copia el package.json y package-lock.json
+# Copy package descriptors
 COPY package*.json ./
 
-# Instala las dependencias
+# Install dependencies
 RUN npm install
 
-# Copia el resto de los archivos de la aplicación
+# Copy the rest of the application files
 COPY . .
 
-# Construye la aplicación para producción
+# Build for production
 RUN npm run build
 
-# Etapa 2: Servir la aplicación con Nginx
+# Stage 2: Serve the app with Nginx
 FROM nginx:stable-alpine
 
-# Copia los archivos construidos desde la etapa de 'build'
+# Copy built artifacts from the build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
 
-# Expone el puerto 80
+# Expose port 80
 EXPOSE 80
 
-# El comando por defecto de Nginx se encargará de servir los archivos
+# Use default Nginx command to serve static files
 CMD ["nginx", "-g", "daemon off;"]

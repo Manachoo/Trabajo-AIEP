@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
@@ -7,12 +5,12 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-    # La base de datos se mantendrá en el volumen para persistencia
-    # Si prefieres que sea efímera y solo para desarrollo, puedes eliminar el volumen.
+    # The database is persisted through the mounted volume.
+    # Remove the volume mount if you want an ephemeral development database.
 
   frontend:
     build: ./frontend
     ports:
-      - "8080:80" # Accede al frontend en http://localhost:8080
+      - "8081:80" # Frontend is available at http://localhost:8081
     depends_on:
       - backend

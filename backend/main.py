@@ -1,11 +1,12 @@
 import sqlite3
 import time
 from typing import List
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-app = FastAPI(title="FoodDelivery API (Anti-Patrón)")
+app = FastAPI(title="FoodDelivery API (Anti-Pattern)")
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,174 +16,175 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Inicializar Base de Datos (Directo en el inicio del script - muy acoplado)
-conn = sqlite3.connect("comida.db", check_same_thread=False)
+conn = sqlite3.connect("food_delivery.db", check_same_thread=False)
 cursor = conn.cursor()
 
-# Creación de tablas e inserción de datos iniciales
-cursor.executescript("""
-CREATE TABLE IF NOT EXISTS usuarios (
+cursor.executescript(
+    """
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT,
-    saldo REAL
+    name TEXT,
+    balance REAL
 );
 
-CREATE TABLE IF NOT EXISTS restaurantes (
+CREATE TABLE IF NOT EXISTS restaurants (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT,
-    activo INTEGER
+    name TEXT,
+    is_active INTEGER
 );
 
-CREATE TABLE IF NOT EXISTS productos (
+CREATE TABLE IF NOT EXISTS products (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    restaurante_id INTEGER,
-    nombre TEXT,
-    precio REAL,
+    restaurant_id INTEGER,
+    name TEXT,
+    price REAL,
     stock INTEGER
 );
 
-CREATE TABLE IF NOT EXISTS pedidos (
+CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    usuario_id INTEGER,
+    user_id INTEGER,
     total REAL,
-    estado TEXT
+    status TEXT
 );
 
--- Insertar datos semilla si la base está vacía
-INSERT INTO usuarios (nombre, saldo) 
-SELECT 'Juan Perez', 500.0 WHERE NOT EXISTS (SELECT 1 FROM usuarios);
+INSERT INTO users (name, balance)
+SELECT 'John Perez', 500.0 WHERE NOT EXISTS (SELECT 1 FROM users);
 
-INSERT INTO restaurantes (nombre, activo) 
-SELECT 'La Hamburguesería', 1 WHERE NOT EXISTS (SELECT 1 FROM restaurantes);
+INSERT INTO restaurants (name, is_active)
+SELECT 'The Burger Place', 1 WHERE NOT EXISTS (SELECT 1 FROM restaurants);
 
-INSERT INTO productos (restaurante_id, nombre, precio, stock) 
-SELECT 1, 'Hamburguesa Doble', 12.50, 10 WHERE NOT EXISTS (SELECT 1 FROM productos);
+INSERT INTO products (restaurant_id, name, price, stock)
+SELECT 1, 'Double Burger', 12.50, 10 WHERE NOT EXISTS (SELECT 1 FROM products);
 
-INSERT INTO productos (restaurante_id, nombre, precio, stock) 
-SELECT 1, 'Papas Fritas', 4.00, 5 WHERE (SELECT count(*) from productos) < 2;
+INSERT INTO products (restaurant_id, name, price, stock)
+SELECT 1, 'French Fries', 4.00, 5 WHERE (SELECT count(*) FROM products) < 2;
 
-INSERT INTO productos (restaurante_id, nombre, precio, stock) 
-SELECT 1, 'Refresco', 2.50, 20 WHERE (SELECT count(*) from productos) < 3;
-""")
+INSERT INTO products (restaurant_id, name, price, stock)
+SELECT 1, 'Soda', 2.50, 20 WHERE (SELECT count(*) FROM products) < 3;
+"""
+)
 conn.commit()
 
 
-# Pydantic Schemas
-class PedidoRequest(BaseModel):
-    usuario_id: int
-    productos_ids: List[int]
+class CreateOrderRequest(BaseModel):
+    user_id: int
+    product_ids: List[int]
 
-class ProductoResponse(BaseModel):
+
+class ProductResponse(BaseModel):
     id: int
-    restaurante_id: int
-    nombre: str
-    precio: float
+    restaurant_id: int
+    name: str
+    price: float
     stock: int
 
 
-# Entidades
-class Usuario:
-    def __init__(self, id, nombre, saldo):
+class User:
+    def __init__(self, id: int, name: str, balance: float):
         self.id = id
-        self.nombre = nombre
-        self.saldo = saldo
+        self.name = name
+        self.balance = balance
 
-class Restaurante:
-    def __init__(self, id, nombre, activo):
-        self.id = id
-        self.nombre = nombre
-        self.activo = activo
 
-class Producto:
-    def __init__(self, id, restaurante_id, nombre, precio, stock):
+class Restaurant:
+    def __init__(self, id: int, name: str, is_active: int):
         self.id = id
-        self.restaurante_id = restaurante_id
-        self.nombre = nombre
-        self.precio = precio
+        self.name = name
+        self.is_active = is_active
+
+
+class Product:
+    def __init__(self, id: int, restaurant_id: int, name: str, price: float, stock: int):
+        self.id = id
+        self.restaurant_id = restaurant_id
+        self.name = name
+        self.price = price
         self.stock = stock
 
-# 🚨 GOD CLASS: La clase Pedido hace todo el trabajo (anti-patrón).
-class Pedido:
+
+class OrderProcessor:
     def __init__(self):
         self.id = None
-        self.usuario_id = None
+        self.user_id = None
         self.total = 0.0
-        self.estado = 'INICIALIZADO'
+        self.status = "INITIALIZED"
 
-    def crear_pedido(self, usuario_id: int, productos_ids: List[int]):
-        # 1. Verificar si el usuario existe
-        cursor.execute("SELECT id, nombre, saldo FROM usuarios WHERE id = ?", (usuario_id,))
-        usr_row = cursor.fetchone()
-        if not usr_row:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado")
-        
-        # 2. Calcular total, verificar stock de cada producto y restar stock 
-        # (Esto mezcla validación, cálculo y actualización destructiva directamente)
-        total_calculado = 0.0
-        for p_id in productos_ids:
-            cursor.execute("SELECT id, restaurante_id, nombre, precio, stock FROM productos WHERE id = ?", (p_id,))
-            prod_row = cursor.fetchone()
-            if not prod_row:
-                raise HTTPException(status_code=404, detail=f"Producto {p_id} no existe")
-            
-            p_stock = prod_row[4]
-            p_precio = prod_row[3]
+    def create_order(self, user_id: int, product_ids: List[int]):
+        cursor.execute("SELECT id, name, balance FROM users WHERE id = ?", (user_id,))
+        user_row = cursor.fetchone()
+        if not user_row:
+            raise HTTPException(status_code=404, detail="User not found")
 
-            if p_stock <= 0:
-                raise HTTPException(status_code=400, detail=f"No hay stock para producto {prod_row[2]}")
-            
-            # Cálculo del carrito
-            total_calculado += p_precio
-            
-            # Disminuir stock inmediatamente en DB (!Problema de transacciones en la God Class)
-            cursor.execute("UPDATE productos SET stock = stock - 1 WHERE id = ?", (p_id,))
+        calculated_total = 0.0
+        for product_id in product_ids:
+            cursor.execute(
+                "SELECT id, restaurant_id, name, price, stock FROM products WHERE id = ?",
+                (product_id,),
+            )
+            product_row = cursor.fetchone()
+            if not product_row:
+                raise HTTPException(status_code=404, detail=f"Product {product_id} does not exist")
 
-        self.total = total_calculado
-        
-        # 3. Procesar "pago" (lógica de negocio simulada mezclada aquí)
-        # Esto debería estar en un servicio externo de finanzas
-        saldo_usuario = usr_row[2]
-        if saldo_usuario < self.total:
-            # Revertir stock (muy mala práctica hacerlo manualmente así en vez de BD transactions)
-            for p_id in productos_ids:
-                cursor.execute("UPDATE productos SET stock = stock + 1 WHERE id = ?", (p_id,))
+            product_stock = product_row[4]
+            product_price = product_row[3]
+
+            if product_stock <= 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No stock available for product {product_row[2]}",
+                )
+
+            calculated_total += product_price
+            cursor.execute("UPDATE products SET stock = stock - 1 WHERE id = ?", (product_id,))
+
+        self.total = calculated_total
+
+        user_balance = user_row[2]
+        if user_balance < self.total:
+            for product_id in product_ids:
+                cursor.execute("UPDATE products SET stock = stock + 1 WHERE id = ?", (product_id,))
             conn.commit()
-            raise HTTPException(status_code=400, detail="Saldo insuficiente para procesar el pago")
-        
-        # Restar saldo al usuario
-        nuevo_saldo = saldo_usuario - self.total
-        cursor.execute("UPDATE usuarios SET saldo = ? WHERE id = ?", (nuevo_saldo, usuario_id))
-        
-        # Simulando tiempo de conexión con Gateway de pagos de terceros
-        time.sleep(1) 
-        self.estado = 'PAGADO'
+            raise HTTPException(status_code=400, detail="Insufficient balance to process payment")
 
-        # 4. Guardar Order en DB y actualizar su estado interno
-        cursor.execute("INSERT INTO pedidos (usuario_id, total, estado) VALUES (?, ?, ?)", 
-                       (usuario_id, self.total, self.estado))
+        new_user_balance = user_balance - self.total
+        cursor.execute("UPDATE users SET balance = ? WHERE id = ?", (new_user_balance, user_id))
+
+        time.sleep(1)
+        self.status = "PAID"
+
+        cursor.execute(
+            "INSERT INTO orders (user_id, total, status) VALUES (?, ?, ?)",
+            (user_id, self.total, self.status),
+        )
         self.id = cursor.lastrowid
         conn.commit()
-        
+
         return {
-            "mensaje": "Pedido creado, pagado y procesado exitosamente",
-            "pedido_id": self.id,
+            "message": "Order created, paid, and processed successfully",
+            "order_id": self.id,
             "total": self.total,
-            "nuevo_saldo_usuario": nuevo_saldo
+            "new_user_balance": new_user_balance,
         }
 
 
-# Endpoints (Controladores que instancian la God Class)
+@app.get("/products", response_model=List[ProductResponse])
+def list_products():
+    cursor.execute("SELECT id, restaurant_id, name, price, stock FROM products WHERE stock > 0")
+    rows = cursor.fetchall()
+    return [
+        {
+            "id": row[0],
+            "restaurant_id": row[1],
+            "name": row[2],
+            "price": row[3],
+            "stock": row[4],
+        }
+        for row in rows
+    ]
 
-@app.get("/productos", response_model=List[ProductoResponse])
-def obtener_productos():
-    # Consulta directa desde API Controller (alto acoplamiento)
-    cursor.execute("SELECT id, restaurante_id, nombre, precio, stock FROM productos WHERE stock > 0")
-    filas = cursor.fetchall()
-    return [{"id": f[0], "restaurante_id": f[1], "nombre": f[2], "precio": f[3], "stock": f[4]} for f in filas]
 
-@app.post("/pedido")
-def procesar_compra(req: PedidoRequest):
-    # Todo en un solo comando
-    pedido_god = Pedido()
-    return pedido_god.crear_pedido(req.usuario_id, req.productos_ids)
-
+@app.post("/orders")
+def create_order_endpoint(request: CreateOrderRequest):
+    order_processor = OrderProcessor()
+    return order_processor.create_order(request.user_id, request.product_ids)

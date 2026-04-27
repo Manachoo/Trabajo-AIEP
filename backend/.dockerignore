@@ -9,5 +9,5 @@ venv/
 env.bak/
 venv.bak/
 db.sqlite3
-comida.db
+food_delivery.db
 .pytest_cache/

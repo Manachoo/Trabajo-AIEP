@@ -1,20 +1,20 @@
-# Usa una imagen base de Python oficial
+# Use an official Python base image
 FROM python:3.10-slim
 
-# Establece el directorio de trabajo en /app
+# Set the working directory to /app
 WORKDIR /app
 
-# Copia el archivo de requerimientos al contenedor
+# Copy requirements file into the container
 COPY requirements.txt .
 
-# Instala las dependencias
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia el resto del código de la aplicación
+# Copy the rest of the application source
 COPY . .
 
-# Expone el puerto en el que se ejecutará la aplicación
+# Expose the application port
 EXPOSE 8000
 
-# Comando para ejecutar la aplicación
+# Command used to run the application
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,37 @@
+{
+  "app": {
+    "title": "Food Delivery"
+  },
+  "header": {
+    "greeting": "Hello",
+    "userLabel": "{{name}} (ID: {{id}})"
+  },
+  "products": {
+    "title": "Available Products",
+    "add": "Add",
+    "emptyState": "Loading products or no stock available...",
+    "table": {
+      "name": "Name",
+      "price": "Price",
+      "stock": "Stock",
+      "action": "Action",
+      "units": "{{count}} units"
+    }
+  },
+  "cart": {
+    "title": "Your Order",
+    "empty": "Your cart is empty.",
+    "remove": "Remove",
+    "total": "Total",
+    "processing": "Processing payment...",
+    "checkout": "Pay and Checkout",
+    "footerNote": "Checkout triggers the backend God Class that handles stock and payment in a single flawed transaction."
+  },
+  "errors": {
+    "fetchProducts": "Failed to load products.",
+    "processOrder": "Failed to process the order."
+  },
+  "messages": {
+    "orderPaid": "Order paid successfully. New balance: {{balance}}"
+  }
+}
