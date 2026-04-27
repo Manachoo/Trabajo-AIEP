@@ -1,12 +1,31 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: food_delivery
+      POSTGRES_USER: food_user
+      POSTGRES_PASSWORD: food_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U food_user -d food_delivery"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build: ./backend
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
-    # The database is persisted through the mounted volume.
-    # Remove the volume mount if you want an ephemeral development database.
+    environment:
+      DATABASE_URL: postgresql+psycopg://food_user:food_password@postgres:5432/food_delivery
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   frontend:
     build: ./frontend
@@ -14,3 +33,6 @@ services:
       - "8081:80" # Frontend is available at http://localhost:8081
     depends_on:
       - backend
+
+volumes:
+  postgres_data:
